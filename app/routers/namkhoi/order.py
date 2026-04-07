@@ -4,7 +4,7 @@ import re
 from typing import List, Optional, Any
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response, StreamingResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 from datetime import datetime
 
 import httpx
@@ -52,6 +52,16 @@ class PDFApiRequest(BaseModel):
     total_after_tax: Optional[str] = None
     customer: Optional[Customer] = None
     items: Optional[List[OrderItem]] = []
+
+    @model_validator(mode='before')
+    @classmethod
+    def extract_data(cls, values: Any) -> Any:
+        if isinstance(values, dict):
+            if 'currentRecord' in values and isinstance(values.get('currentRecord'), dict):
+                data_node = values['currentRecord'].get('data')
+                if isinstance(data_node, dict):
+                    return data_node
+        return values
 
 router = APIRouter(prefix="/order", tags=["namkhoi"])
 
