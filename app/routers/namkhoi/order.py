@@ -57,6 +57,14 @@ class PDFApiRequest(BaseModel):
     @classmethod
     def extract_data(cls, values: Any) -> Any:
         if isinstance(values, dict):
+            import json
+            try:
+                print("======== API /order INPUT PAYLOAD ========")
+                print(json.dumps(values, indent=2, ensure_ascii=False))
+                print("==========================================")
+            except Exception:
+                print(f"[API /order] RAW PAYLOAD: {values}")
+
             if 'currentRecord' in values and isinstance(values.get('currentRecord'), dict):
                 data_node = values['currentRecord'].get('data')
                 if isinstance(data_node, dict):
