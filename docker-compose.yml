@@ -8,7 +8,8 @@ services:
     ports:
       - "8000:8000"
     networks:
-      - app-network
+      - internal
+      - traefik_net
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.api.rule=Host(`namkhoiapi.nexpo.vn`)"
