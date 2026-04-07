@@ -16,7 +16,7 @@ services:
       - "traefik.http.routers.api.entrypoints=websecure"
       - "traefik.http.routers.api.tls.certresolver=myresolver"
       - "traefik.http.services.api.loadbalancer.server.port=8000"
-      - "traefik.docker.network=benocode-network"
+      - "traefik.docker.network=app-network"
     
 networks:
   internal:
