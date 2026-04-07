@@ -18,6 +18,8 @@ services:
       - "traefik.docker.network=benocode-network"
     
 networks:
-  benocode-network:
-    name: benocode-network
+  internal:
     driver: bridge
+  traefik_net:
+    external: true
+    name: app-network
