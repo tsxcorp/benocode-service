@@ -65,10 +65,19 @@ class PDFApiRequest(BaseModel):
             except Exception:
                 print(f"[API /order] RAW PAYLOAD: {values}")
 
+            # Trường hợp 1: {"currentRecord": {"data": {...}}}
             if 'currentRecord' in values and isinstance(values.get('currentRecord'), dict):
                 data_node = values['currentRecord'].get('data')
                 if isinstance(data_node, dict):
                     return data_node
+
+            # Trường hợp 2: {"data": {...}} (thường là gửi 1 record)
+            if 'data' in values and isinstance(values.get('data'), dict):
+                return values['data']
+
+            # Trường hợp 3: {"data": [ ... ]} (NocoBase gửi list các items khi bấm ở Table block)
+            if 'data' in values and isinstance(values.get('data'), list):
+                return {"items": values['data']}
         return values
 
 router = APIRouter(prefix="/order", tags=["namkhoi"])
