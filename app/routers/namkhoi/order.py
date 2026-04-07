@@ -3,7 +3,7 @@ import os
 import re
 from typing import List, Optional, Any
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 
@@ -330,13 +330,14 @@ async def export_pdf(data: PDFApiRequest):
     try:
         pdf_bytes = build_pdf_document(data)
         
-        pdf_stream = io.BytesIO(pdf_bytes)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         headers = {
-            'Content-Disposition': f'attachment; filename="Order_export_{timestamp}.pdf"'
+            'Content-Disposition': f'attachment; filename="Order_export_{timestamp}.pdf"',
+            'Access-Control-Expose-Headers': 'Content-Disposition',
+            'Content-Length': str(len(pdf_bytes))
         }
-        return StreamingResponse(
-            pdf_stream, 
+        return Response(
+            content=pdf_bytes, 
             media_type="application/pdf", 
             headers=headers
         )
