@@ -29,6 +29,18 @@ class QuoteItem(BaseModel):
     item_notes: Optional[str] = None
     product: Optional[Product] = None
 
+    @model_validator(mode='before')
+    @classmethod
+    def map_aliases(cls, values: Any) -> Any:
+        if isinstance(values, dict):
+            if 'quantity' in values and 'order_quantity' not in values:
+                values['order_quantity'] = values['quantity']
+            if 'unit_price' in values and 'quoted_price' not in values:
+                values['quoted_price'] = values['unit_price']
+            if 'subtotal_revenue' in values and 'subtotal' not in values:
+                values['subtotal'] = values['subtotal_revenue']
+        return values
+
 class Customer(BaseModel):
     model_config = ConfigDict(extra='ignore')
     customer_name: Optional[str] = None
@@ -48,12 +60,29 @@ class QuotePDFRequest(BaseModel):
     @classmethod
     def extract_data(cls, values: Any) -> Any:
         if isinstance(values, dict):
+            extracted = values
             if 'currentRecord' in values and isinstance(values.get('currentRecord'), dict):
                 data_node = values['currentRecord'].get('data')
                 if isinstance(data_node, dict):
-                    return data_node
-            if 'data' in values and isinstance(values.get('data'), dict):
-                return values['data']
+                    extracted = data_node
+            elif 'data' in values:
+                if isinstance(values['data'], dict):
+                    extracted = values['data']
+                elif isinstance(values['data'], list) and len(values['data']) > 0:
+                    first = values['data'][0]
+                    if isinstance(first, dict):
+                        if 'product_id' in first or 'unit_price' in first or 'quoted_price' in first:
+                            extracted = {"quote_items": values['data']}
+                        else:
+                            extracted = first
+            
+            # Map alternative naming conventions
+            if isinstance(extracted, dict):
+                if 'items' in extracted and 'quote_items' not in extracted:
+                    extracted['quote_items'] = extracted['items']
+                if 'total_after_tax' in extracted and 'total_after_vat' not in extracted:
+                    extracted['total_after_vat'] = extracted['total_after_tax']
+            return extracted
         return values
 
 router = APIRouter(prefix="/quote", tags=["namkhoi"])
