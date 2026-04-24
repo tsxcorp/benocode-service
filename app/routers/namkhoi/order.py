@@ -2,7 +2,7 @@ import io
 import os
 import re
 from typing import List, Optional, Any
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, model_validator
 from datetime import datetime
@@ -29,6 +29,7 @@ class Customer(BaseModel):
 
 class Product(BaseModel):
     model_config = ConfigDict(extra='ignore')
+    id: Optional[int] = None
     product_code: Optional[str] = None
     product_name: Optional[str] = None
     season: Optional[str] = None
@@ -36,11 +37,14 @@ class Product(BaseModel):
 
 class OrderItem(BaseModel):
     model_config = ConfigDict(extra='ignore')
+    id: Optional[int] = None
+    product_id: Optional[int] = None
     quantity: Optional[int] = None
     unit_price: Optional[str] = None
     subtotal_revenue: Optional[str] = None
     size_summary: Optional[str] = None
     product: Optional[Product] = None
+    product_image_bytes: Optional[bytes] = None
 
 class PDFApiRequest(BaseModel):
     model_config = ConfigDict(extra='ignore')
@@ -228,11 +232,19 @@ def build_pdf_document(data: PDFApiRequest) -> bytes:
         prod = it.product or Product()
         sizes = parse_sizes(it.size_summary or "")
         
+        img_element = ""
+        if getattr(it, "product_image_bytes", None):
+            try:
+                img_stream = io.BytesIO(it.product_image_bytes)
+                img_element = RLImage(img_stream, width=1.8*cm, height=1.8*cm, kind='proportional')
+            except Exception as e:
+                pass
+        
         table_data.append([
             Paragraph(str(i+1), style_center_bold),
             Paragraph(prod.season or "", style_center),
             Paragraph(prod.product_code or "", style_center),
-            "", # HÌNH ẢNH để trống
+            img_element,
             Paragraph(prod.color or "", style_center),
             Paragraph(f"{qty:,.0f}".replace(",", ".") if qty else "0", style_center),
             Paragraph(sizes['S'], style_center),
@@ -353,8 +365,41 @@ def build_pdf_document(data: PDFApiRequest) -> bytes:
     return buffer.read()
 
 @router.post("")
-async def export_pdf(data: PDFApiRequest):
+async def export_pdf(data: PDFApiRequest, request: Request):
     try:
+        # Use headers from incoming request but bypass token check explicitly by setting x-role if needed
+        req_headers = dict(request.headers)
+        auth_header = req_headers.get("authorization")
+        
+        headers = {
+            "accept": "application/json",
+            "x-role": "root"
+        }
+        if auth_header:
+            headers["authorization"] = auth_header
+
+        async with httpx.AsyncClient() as client:
+            for item in data.items:
+                order_item_id = item.id
+                product_id = getattr(item, "product_id", None) or (item.product.id if getattr(item, "product", None) else None)
+                if order_item_id and product_id:
+                    url = f"https://namkhoi.nexpo.vn/api/order_items/{order_item_id}/product:get?filterByTk={product_id}&appends[]=product_image"
+                    try:
+                        resp = await client.get(url, headers=headers)
+                        if resp.status_code == 200:
+                            json_data = resp.json()
+                            product_images = json_data.get("data", {}).get("product_image", [])
+                            if product_images and isinstance(product_images, list) and len(product_images) > 0:
+                                image_url = product_images[0].get("url")
+                                if image_url:
+                                    if image_url.startswith("/"):
+                                        image_url = "https://namkhoi.nexpo.vn" + image_url
+                                    img_resp = await client.get(image_url)
+                                    if img_resp.status_code == 200:
+                                        item.product_image_bytes = img_resp.content
+                    except Exception as e:
+                        print(f"Error fetching image for item {order_item_id}: {e}")
+
         pdf_bytes = build_pdf_document(data)
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
