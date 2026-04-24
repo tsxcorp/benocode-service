@@ -1,23 +1,19 @@
 version: '3.8'
-
 services:
   api:
     build: .
     container_name: benocode-services
     restart: always
-    ports:
-      - "8000:8000"
     networks:
-      - internal
-      - traefik_net
+    - internal
+    - traefik_net
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.api.rule=Host(`namkhoiapi.nexpo.vn`)"
-      - "traefik.http.routers.api.entrypoints=websecure"
-      - "traefik.http.routers.api.tls.certresolver=myresolver"
-      - "traefik.http.services.api.loadbalancer.server.port=8000"
-      - "traefik.docker.network=app-network"
-    
+    - traefik.enable=true
+    - traefik.http.routers.api.rule=Host(`namkhoiapi.nexpo.vn`)
+    - traefik.http.routers.api.entrypoints=websecure
+    - traefik.http.routers.api.tls.certresolver=myresolver
+    - traefik.http.services.api.loadbalancer.server.port=8000
+    - traefik.docker.network=app-network
 networks:
   internal:
     driver: bridge
